@@ -34,11 +34,11 @@ public class TicketServiceImpl implements TicketService {
      * Validates the purchase request, calculates total cost and required seats,
      * processes payment, and reserves seats for the given account.
      *
-     * @param accountId           must be a non-null positive account identifier
-     * @param ticketTypeRequests  one or more ticket requests (max 25 tickets total;
-     *                            children/infants require at least one adult, and
-     *                            infants cannot outnumber adults)
-     * @throws InvalidPurchaseException   if any validation or business rule is violated
+     * @param accountId          must be a non-null positive account identifier
+     * @param ticketTypeRequests one or more ticket requests (max 25 tickets total;
+     *                           children/infants require at least one adult, and
+     *                           infants cannot outnumber adults)
+     * @throws InvalidPurchaseException if any validation or business rule is violated
      */
     @Override
     public void purchaseTickets(Long accountId, TicketTypeRequest... ticketTypeRequests) throws InvalidPurchaseException {
@@ -99,7 +99,9 @@ public class TicketServiceImpl implements TicketService {
     }
 
     private int calculateTotalAmount(Map<Type, Long> ticketCounts) {
-        long total = (ticketCounts.get(Type.ADULT) * ADULT_TICKET_PRICE) + (ticketCounts.get(Type.CHILD) * CHILD_TICKET_PRICE) + (ticketCounts.get(Type.INFANT) * INFANT_TICKET_PRICE);
+        long total = (ticketCounts.get(Type.ADULT) * ADULT_TICKET_PRICE)
+                + (ticketCounts.get(Type.CHILD) * CHILD_TICKET_PRICE)
+                + (ticketCounts.get(Type.INFANT) * INFANT_TICKET_PRICE);
         return Math.toIntExact(total);
     }
 
