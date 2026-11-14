@@ -13,6 +13,7 @@ import java.util.Map;
 
 public class TicketServiceImpl implements TicketService {
 
+    private static final int MAX_TICKETS_PER_PURCHASE = 25;
     private static final int ADULT_TICKET_PRICE = 25;
     private static final int CHILD_TICKET_PRICE = 15;
     private static final int INFANT_TICKET_PRICE = 0;
@@ -30,12 +31,20 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * Should only have private methods other than the one below.
+     * Validates the purchase request, calculates total cost and required seats,
+     * processes payment, and reserves seats for the given account.
+     *
+     * @param accountId           must be a non-null positive account identifier
+     * @param ticketTypeRequests  one or more ticket requests (max 25 tickets total;
+     *                            children/infants require at least one adult, and
+     *                            infants cannot outnumber adults)
+     * @throws InvalidPurchaseException   if any validation or business rule is violated
      */
     @Override
     public void purchaseTickets(Long accountId, TicketTypeRequest... ticketTypeRequests) throws InvalidPurchaseException {
         validateAccountId(accountId);
-        Map<Type, Long> ticketCounts = aggregateRequests(ticketTypeRequests);
+        Map<Type, Long> ticketCounts = aggregateAndValidateRequests(ticketTypeRequests);
+        validateBusinessRules(ticketCounts);
 
         int totalAmountToPay = calculateTotalAmount(ticketCounts);
         int totalSeatsToAllocate = calculateTotalSeats(ticketCounts);
@@ -50,21 +59,43 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
-    private Map<Type, Long> aggregateRequests(TicketTypeRequest... ticketTypeRequests) {
+    private Map<Type, Long> aggregateAndValidateRequests(TicketTypeRequest... ticketTypeRequests) {
+        if (ticketTypeRequests == null || ticketTypeRequests.length == 0) {
+            throw new InvalidPurchaseException();
+        }
+
         Map<Type, Long> ticketCounts = new EnumMap<>(Type.class);
         for (Type type : Type.values()) {
             ticketCounts.put(type, 0L);
         }
 
-        if (ticketTypeRequests != null) {
-            for (TicketTypeRequest request : ticketTypeRequests) {
-                if (request != null && request.getTicketType() != null) {
-                    ticketCounts.merge(request.getTicketType(), (long) request.getNoOfTickets(), Long::sum);
-                }
+        for (TicketTypeRequest request : ticketTypeRequests) {
+            if (request == null || request.getTicketType() == null || request.getNoOfTickets() <= 0) {
+                throw new InvalidPurchaseException();
             }
+            ticketCounts.merge(request.getTicketType(), (long) request.getNoOfTickets(), Long::sum);
         }
 
         return ticketCounts;
+    }
+
+    private void validateBusinessRules(Map<Type, Long> ticketCounts) {
+        long adultCount = ticketCounts.get(Type.ADULT);
+        long childCount = ticketCounts.get(Type.CHILD);
+        long infantCount = ticketCounts.get(Type.INFANT);
+        long totalTickets = adultCount + childCount + infantCount;
+
+        if (totalTickets > MAX_TICKETS_PER_PURCHASE) {
+            throw new InvalidPurchaseException();
+        }
+
+        if (adultCount == 0 && (childCount > 0 || infantCount > 0)) {
+            throw new InvalidPurchaseException();
+        }
+
+        if (infantCount > adultCount) {
+            throw new InvalidPurchaseException();
+        }
     }
 
     private int calculateTotalAmount(Map<Type, Long> ticketCounts) {
